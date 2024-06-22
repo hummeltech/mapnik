@@ -181,8 +181,7 @@
                 "BUILD_TESTING": "ON",
                 "BUILD_DEMO_VIEWER": "OFF",
                 "DISABLE_MAPNIK_AUTOSETUP": "ON"
-            },
-            "toolchainFile": "vcpkg/scripts/buildsystems/vcpkg.cmake"
+            }
         },
         {
             "name": "windows-ci",
@@ -197,7 +196,8 @@
             },
             "environment": {
                 "PROJ_LIB": "${sourceDir}/build/vcpkg_installed/x64-windows/share/proj"
-            }
+            },
+            "toolchainFile": "vcpkg/scripts/buildsystems/vcpkg.cmake"
         },
         {
             "name": "linux-ci",
@@ -209,9 +209,6 @@
             ],
             "cacheVariables": {
                 "CMAKE_CXX_FLAGS": "--coverage"
-            },
-            "environment": {
-                "PROJ_LIB": "${sourceDir}/build/vcpkg_installed/x64-linux/share/proj"
             }
         },
         {
@@ -238,9 +235,6 @@
             ],
             "cacheVariables": {
                 "CMAKE_CXX_FLAGS": "-fprofile-arcs -ftest-coverage"
-            },
-            "environment": {
-                "PROJ_LIB": "${sourceDir}/build/vcpkg_installed/arm64-osx/share/proj"
             }
         },
         {
@@ -254,9 +248,6 @@
             ],
             "cacheVariables": {
                 "CMAKE_CXX_FLAGS": "-fprofile-arcs -ftest-coverage"
-            },
-            "environment": {
-                "PROJ_LIB": "${sourceDir}/build/vcpkg_installed/x64-osx/share/proj"
             }
         }
     ],

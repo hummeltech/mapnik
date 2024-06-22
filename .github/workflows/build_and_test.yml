@@ -9,8 +9,7 @@ on:
       - "no-ci-*"
 
 env:
-  VCPKG_BINARY_SOURCES: "clear;nuget,GitHub,readwrite"
-  VCPKG_NUGET_REPOSITORY: https://github.com/mathisloge/vcpkg-nuget.git
+  VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
 
 jobs:
   checkSource:
@@ -21,7 +20,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: "3.10"
       - uses: pre-commit/action@v3.0.1
 
   buildAndTest:
@@ -31,6 +30,7 @@ jobs:
       (C++ ${{ matrix.cxx-standard }})
       ${{ startsWith(matrix.os, 'macos-') && (matrix.os == 'macos-14' && '(ARM64)' || '(AMD64)') || '' }}
     needs: checkSource
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
@@ -40,74 +40,135 @@ jobs:
           - windows-2022
         cxx-standard:
           - 17
-        include:
-          - os: macos-14
-            mono: mono
-          - os: ubuntu-22.04
-            mono: mono
-          - os: windows-2022
-
-    runs-on: ${{ matrix.os }}
 
     steps:
-      - name: "Install required system packages"
-        shell: bash
-        run: |
-          if [ "$RUNNER_OS" == "Windows" ]; then
-            choco install ninja OpenCppCoverage
-            echo "C:\Program Files\OpenCppCoverage" >> ${GITHUB_PATH}
-          elif [ "$RUNNER_OS" == "Linux" ]; then
-            sudo apt update
-            sudo apt install -y gperf libxxf86vm-dev ninja-build postgresql-client lcov autoconf-archive
-          else
-            brew install automake ninja lcov autoconf-archive
-          fi
-
-      - uses: ilammy/msvc-dev-cmd@v1
-        if: runner.os == 'Windows'
-
-      - name: checkout mapnik
+      - name: Checkout Mapnik
         uses: actions/checkout@v4
         with:
-          submodules: "recursive"
+          submodules: recursive
 
-      - name: setup vcpkg
-        uses: ./.github/actions/setup_vcpkg
+      - name: Export GitHub Actions cache environment variables
+        uses: actions/github-script@v7
         with:
-          vcpkg-sha: ad25766aefb5313b6bc4e2a4b78a2946f84fbf66
-          nuget-source: https://nuget.pkg.github.com/mapnik/index.json
-          nuget-username: ${{ github.actor }}
-          nuget-pat: ${{ secrets.GITHUB_TOKEN }}
-          mono: ${{ matrix.mono }}
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
 
-      - name: Set PRESET environment variable to lower case runner OS
+      - name: Install required system packages
+        shell: bash
+        run: |
+          if [ "${RUNNER_OS}" == "Linux" ]; then
+            sudo apt update
+            sudo apt install -y \
+              cmake \
+              gperf \
+              lcov \
+              libxxf86vm-dev \
+              ninja-build \
+              pkgconf \
+              postgresql-client \
+              libboost-filesystem-dev \
+              libboost-program-options-dev \
+              libboost-regex-dev \
+              libboost-system-dev \
+              libboost-thread-dev \
+              libcairo2-dev \
+              libcurl4-openssl-dev \
+              libfreetype-dev \
+              libgdal-dev \
+              libharfbuzz-dev \
+              libicu-dev \
+              libjpeg-dev \
+              libpng-dev \
+              libpq-dev \
+              libproj-dev \
+              libsqlite3-dev \
+              libtiff-dev \
+              libwebp-dev \
+              libxml2-dev \
+              libgl1-mesa-dev \
+              qt6-base-dev \
+              zlib1g-dev
+          elif [ "${RUNNER_OS}" == "macOS" ]; then
+            brew install \
+              cmake \
+              lcov \
+              ninja \
+              pkg-config \
+              boost \
+              cairo \
+              freetype \
+              gdal \
+              harfbuzz \
+              icu4c \
+              jpeg-turbo \
+              libpng \
+              libpq \
+              libtiff \
+              libxml2 \
+              postgresql \
+              proj \
+              qt \
+              sqlite \
+              webp
+          elif [ "${RUNNER_OS}" == "Windows" ]; then
+            choco install \
+              ninja \
+              OpenCppCoverage
+            echo "C:\Program Files\OpenCppCoverage" >> ${GITHUB_PATH}
+          fi
+
+      - name: Enable Developer Command Prompt (Windows)
+        uses: ilammy/msvc-dev-cmd@v1
+        if: runner.os == 'Windows'
+
+      - name: Set CMAKE_BUILD_PARALLEL_LEVEL, CTEST_PARALLEL_LEVEL & PRESET
         shell: bash
         run: |
           LC_RUNNER_OS=$(echo "${RUNNER_OS}" | perl -ne "print lc")
-          if [ "${RUNNER_OS}" == "macOS" ]; then
-            MACOS_ARCH=${{ matrix.os == 'macos-14' && 'arm64' || 'x64' }}
-            echo "PRESET=${LC_RUNNER_OS}-ci-${MACOS_ARCH}" >> ${GITHUB_ENV}
-          else
-            echo "PRESET=${LC_RUNNER_OS}-ci" >> ${GITHUB_ENV}
+          PRESET=${LC_RUNNER_OS}-ci
+          if [ "${RUNNER_OS}" == "Linux" ]; then
+            echo "CMAKE_BUILD_PARALLEL_LEVEL=$(nproc)" >> ${GITHUB_ENV}
+            echo "CTEST_PARALLEL_LEVEL=$(nproc)" >> ${GITHUB_ENV}
+          elif [ "${RUNNER_OS}" == "macOS" ]; then
+            echo "CMAKE_BUILD_PARALLEL_LEVEL=$(sysctl -n hw.logicalcpu)" >> ${GITHUB_ENV}
+            echo "CTEST_PARALLEL_LEVEL=$(sysctl -n hw.logicalcpu)" >> ${GITHUB_ENV}
+            PRESET=${LC_RUNNER_OS}-ci-${{ matrix.os == 'macos-14' && 'arm64' || 'x64' }}
+          elif [ "${RUNNER_OS}" == "Windows" ]; then
+            echo "CMAKE_BUILD_PARALLEL_LEVEL=$(pwsh -Command '(Get-CimInstance -ClassName Win32_ComputerSystem).NumberOfLogicalProcessors')" >> ${GITHUB_ENV}
+            echo "CTEST_PARALLEL_LEVEL=$(pwsh -Command '(Get-CimInstance -ClassName Win32_ComputerSystem).NumberOfLogicalProcessors')" >> ${GITHUB_ENV}
           fi
+          echo "PRESET=${PRESET}" >> ${GITHUB_ENV}
 
-      - name: Ensure libtool is installed on macOS
+      - name: Set CPATH, ICU_ROOT & LIBRARY_PATH (macOS)
         shell: bash
-        run: brew install libtool
+        run: |
+          echo "CPATH=$(brew --prefix)/include" >> ${GITHUB_ENV}
+          echo "ICU_ROOT=$(brew --prefix icu4c)" >> ${GITHUB_ENV}
+          echo "LIBRARY_PATH=$(brew --prefix)/lib" >> ${GITHUB_ENV}
         if: runner.os == 'macOS'
+
+      - name: Link VCPKG_INSTALLATION_ROOT to vcpkg (Windows)
+        shell: bash
+        run: |
+          ln -s ${VCPKG_INSTALLATION_ROOT} vcpkg
+        if: runner.os == 'Windows'
 
       - name: Configure CMake
         shell: bash
         run: |
-          cmake \
-            -DBUILD_SHARED_LIBS:BOOL='ON' \
-            -DCMAKE_CXX_STANDARD=${{ matrix.cxx-standard }}  \
-            -DUSE_MEMORY_MAPPED_FILE:BOOL='ON' \
-            -LA \
-            --preset ${{ env.PRESET }}
+          cmake --preset ${PRESET} \
+            -DBUILD_SHARED_LIBS:BOOL=ON \
+            -DCMAKE_CXX_STANDARD:STRING=${{ matrix.cxx-standard }}  \
+            -DUSE_MEMORY_MAPPED_FILE:BOOL=ON \
+            -LA
 
       - name: Build
-        run: cmake --build --preset ${{ env.PRESET }}
+        shell: bash
+        run: |
+          cmake \
+            --build \
+            --preset ${PRESET}
 
       - name: Run Tests
         uses: ./.github/actions/run_tests
