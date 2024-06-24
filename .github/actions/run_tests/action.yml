@@ -10,52 +10,35 @@ runs:
     - name: Set PROJ_LIB
       shell: bash
       run: |
-        if [ "${RUNNER_OS}" == "Windows" ]; then
-          cmake --preset ${{ inputs.cmake-preset }} \
-            -N -L | grep -o "PROJ_LIB=.*" >> ${GITHUB_ENV}
-        else
-          echo "PROJ_LIB="$(pkg-config proj --variable datadir) >> ${GITHUB_ENV}
-        fi
+        cmake --preset ${{ inputs.cmake-preset }} -N -L | grep -o "PROJ_LIB=.*" >> ${GITHUB_ENV}
+
+    - name: Set TEST_WRAPPER (Windows)
+      if: runner.os == 'Windows'
+      shell: bash
+      run: |-
+          echo "TEST_WRAPPER=OpenCppCoverage \
+          --cover_children \
+          --export_type binary \
+          --modules '*.input' \
+          --modules '*libmapnik*' \
+          --modules 'mapnik*.exe' \
+          --quiet \
+          --sources '${{ github.workspace }}' \
+          --" >> ${GITHUB_ENV}
 
     - name: Test
       shell: bash
       env:
         UPDATE: 1
       run: |
-        if [ "${RUNNER_OS}" == "Windows" ]; then
-          OpenCppCoverage \
-            --cover_children \
-            --export_type binary \
-            --modules '*.input' \
-            --modules '*libmapnik*' \
-            --modules 'mapnik*.exe' \
-            --quiet \
-            --sources '${{ github.workspace }}' \
-            -- \
-            ctest --preset ${{ inputs.cmake-preset }}
-        else
-          ctest --preset ${{ inputs.cmake-preset }}
-        fi
+        ${TEST_WRAPPER:-} ctest --preset ${{ inputs.cmake-preset }}
 
     - name: Test visuals
       continue-on-error: true
       working-directory: build/out
       shell: bash
       run: |
-        if [ "${RUNNER_OS}" == "Windows" ]; then
-          OpenCppCoverage \
-            --cover_children \
-            --export_type binary \
-            --modules '*.input' \
-            --modules '*libmapnik*' \
-            --modules 'mapnik*.exe' \
-            --quiet \
-            --sources '${{ github.workspace }}' \
-            -- \
-            ./mapnik-test-visual -j ${CTEST_PARALLEL_LEVEL} --output-dir visual-test-result
-        else
-          ./mapnik-test-visual -j ${CTEST_PARALLEL_LEVEL} --output-dir visual-test-result
-        fi
+        ${TEST_WRAPPER:-} ./mapnik-test-visual -j ${CTEST_PARALLEL_LEVEL} --output-dir visual-test-result
 
     - name: Pack visual test results
       working-directory: build/out
@@ -80,7 +63,8 @@ runs:
       working-directory: build/out
       if: runner.os != 'Windows'
       shell: bash
-      run: ./run_benchmarks
+      run: |
+        ./run_benchmarks
 
     - name: Collect coverage (Linux & macOS)
       working-directory: build
