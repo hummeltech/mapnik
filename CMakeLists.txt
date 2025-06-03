@@ -84,6 +84,7 @@ mapnik_option(BUILD_DEMO_CPP "builds the demo c++ application" ON)
 mapnik_option(BUILD_BENCHMARK "builds benchmark project" ON)
 
 mapnik_option(BUILD_UTILITY_GEOMETRY_TO_WKB "builds the utility program geometry_to_wkb" ON)
+mapnik_option(BUILD_UTILITY_MAPNIK_CONFIG "builds the utility program mapnik-config" OFF)
 mapnik_option(BUILD_UTILITY_MAPNIK_INDEX "builds the utility program mapnik_index" ON)
 mapnik_option(BUILD_UTILITY_MAPNIK_RENDER "builds the utility program mapnik_render" ON)
 mapnik_option(BUILD_UTILITY_OGRINDEX "builds the utility program ogrindex" OFF)
@@ -448,6 +449,10 @@ feature_summary(FILENAME "${CMAKE_CURRENT_BINARY_DIR}/packages.log" WHAT PACKAGE
 # start package mapnik
 include(MapnikExport)
 include(MapnikExportPkgConfig)
+# build mapnik-config utility (relies on .pc files from above)
+if(BUILD_UTILITY_MAPNIK_CONFIG)
+    add_subdirectory(utils/mapnik-config)
+endif()
 
 install(DIRECTORY include/mapnik/ DESTINATION "${MAPNIK_INCLUDE_DIR}/mapnik")
 install(DIRECTORY deps/agg/include/ DESTINATION "${MAPNIK_INCLUDE_DIR}/mapnik/agg")
