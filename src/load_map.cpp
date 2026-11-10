@@ -660,12 +660,12 @@ void map_parser::parse_layer(Parent& parent, xml_node const& node)
     {
         optional<mapnik::boolean_type> status = node.get_opt_attr<mapnik::boolean_type>("status");
 
-        // return early is status is off
-        if (status && !(*status))
-        {
-            node.set_ignore(true);
-            return;
-        }
+        // // return early is status is off
+        // if (status && !(*status))
+        // {
+        //     node.set_ignore(true);
+        //     return;
+        // }
 
         name = node.get_attr("name", std::string("Unnamed"));
 
